@@ -75,7 +75,7 @@ class ExampleCartesianActionsWithNotifications:
             self.location_x=None
             self.location_y=None
             self.location_z=None
-            self.aruco_detected=False
+
         except:
             self.is_init_success = False
         else:
@@ -92,7 +92,7 @@ class ExampleCartesianActionsWithNotifications:
         self.location_x=None
         self.location_y=None
         self.location_z=None
-        self.aruco_detected=False
+
         if len(data.markers)>0:
             for marker in data.markers:
                 self.marker_present=False
@@ -147,62 +147,6 @@ class ExampleCartesianActionsWithNotifications:
 
             return self.wait_for_action_end_or_abort()
             #return True
-
-    def follow_aruco(self,aruco_location_x,aruco_location_y,aruco_location_z):
-        # Prepare and send pose
-        my_cartesian_speed = CartesianSpeed()
-        my_cartesian_speed.translation = 0.05 # m/s
-        my_cartesian_speed.orientation = 15  # deg/s
-        rate=rospy.Rate(20)
-        my_constrained_pose = ConstrainedPose()
-        my_constrained_pose.constraint.oneof_type.speed.append(my_cartesian_speed)
-        
-        while not rospy.is_shutdown():
-                if aruco_location_x and aruco_location_y and aruco_location_z:
-                    # rospy.logerr("Arcuo(s) are detected")
-                    self.aruco_detected=True
-                else:
-                    # rospy.logerr("Failed to detect aruco(s)")
-                    self.aruco_detected=False
-                if self.aruco_detected:
-                    if (abs(self.tool_pose_x-aruco_location_x)>0.005 or abs(self.tool_pose_y-aruco_location_y)>0.005):
-                        self.goto(self.location_x,aruco_location_y,0.25)
-                        
-                        my_constrained_pose.target_pose.x = aruco_location_x
-                        my_constrained_pose.target_pose.y = aruco_location_y
-                        my_constrained_pose.target_pose.z = 0.25
-                        my_constrained_pose.target_pose.theta_x = 180.0
-                        my_constrained_pose.target_pose.theta_y = 0.0
-                        my_constrained_pose.target_pose.theta_z = 90.0
-
-                        req = ExecuteActionRequest()
-                        req.input.oneof_action_parameters.reach_pose.append(my_constrained_pose)
-                        req.input.name = "To_aruco_pos"
-                        req.input.handle.action_type = ActionType.REACH_POSE
-                        req.input.handle.identifier = 1001
-
-                        rospy.loginfo("Sending aruco pose ...")
-                        self.last_action_notif_type = None
-                        try:
-                            self.execute_action(req)
-                        except rospy.ServiceException:
-                            rospy.logerr("Failed to send aruco pose")
-                            success = False
-                        else:
-                            rospy.loginfo("Waiting for aruco pose to finish...")
-                            rospy.logerr("Finished")
-                            rospy.logerr(str(aruco_location_x))
-                            return (self.wait_for_action_end_or_abort(),aruco_location_x,aruco_location_y,aruco_location_z)
-                            
-                    #when the position is reached
-                    else:
-                        break
-        
-                                
-                rate.sleep()
-                rospy.loginfo(str(aruco_location_x))
-                
-                
     def cb_action_topic(self, notif):
         self.last_action_notif_type = notif.action_event
 
@@ -339,22 +283,24 @@ class ExampleCartesianActionsWithNotifications:
             success &= self.example_subscribe_to_a_robot_notification()
 
             #*******************************************************************************
-            # Prepare and send pose
+            # Prepare and send pose 1
             my_cartesian_speed = CartesianSpeed()
             my_cartesian_speed.translation = 0.05 # m/s
             my_cartesian_speed.orientation = 15  # deg/s
             rate=rospy.Rate(20)
-            my_constrained_pose = ConstrainedPose()
-            my_constrained_pose.constraint.oneof_type.speed.append(my_cartesian_speed)
             
             while not rospy.is_shutdown():
+                my_constrained_pose = ConstrainedPose()
+                my_constrained_pose.constraint.oneof_type.speed.append(my_cartesian_speed)
+                #if prev_location_x-self.location_x<0.01 and prev_location_y-self.location_y<0.01:
+                pickedup=False
                 if self.location_x and self.location_y and self.location_z:
                     # rospy.logerr("Arcuo(s) are detected")
-                    self.aruco_detected=True
+                    aruco_detected=True
                 else:
                     # rospy.logerr("Failed to detect aruco(s)")
-                    self.aruco_detected=False
-                if self.aruco_detected:
+                    aruco_detected=False
+                if aruco_detected:
                     if (abs(self.tool_pose_x-self.location_x)>0.005 or abs(self.tool_pose_y-self.location_y)>0.005):
                         self.goto(self.location_x,self.location_y,0.25)
                         
@@ -367,49 +313,171 @@ class ExampleCartesianActionsWithNotifications:
 
                         req = ExecuteActionRequest()
                         req.input.oneof_action_parameters.reach_pose.append(my_constrained_pose)
-                        req.input.name = "To_aruco_pos"
+                        req.input.name = "pose1"
                         req.input.handle.action_type = ActionType.REACH_POSE
                         req.input.handle.identifier = 1001
 
-                        rospy.loginfo("Sending aruco pose ...")
+                        rospy.loginfo("Sending pose 1...")
                         self.last_action_notif_type = None
                         try:
                             self.execute_action(req)
                         except rospy.ServiceException:
-                            rospy.logerr("Failed to send aruco pose")
+                            rospy.logerr("Failed to send pose 1")
                             success = False
                         else:
-                            rospy.loginfo("Waiting for aruco pose to finish...")
-                            rospy.logerr("Finished")
-                            rospy.logerr(str(self.location_x))
-                            # return (self.wait_for_action_end_or_abort(),sel,aruco_location_y,aruco_location_z)
-                            
-                    #when the position is reached
-                    else:
-                        break
-    
-                            
+                            rospy.loginfo("Waiting for pose 1 to finish...")
+
+                    
+                # else:
+                #     # break
+                #     self.marker_present=True
+
+                '''
+                elif abs(self.tool_pose_x-self.location_x)<0.01 or abs(self.tool_pose_y-self.location_y)<0.01: #and self.marker_present:
+                    my_constrained_pose = ConstrainedPose()
+                    my_constrained_pose.constraint.oneof_type.speed.append(my_cartesian_speed)
+                    my_constrained_pose.target_pose.x = self.location_x
+                    my_constrained_pose.target_pose.y = self.location_y
+                    my_constrained_pose.target_pose.z = 0.25
+                    my_constrained_pose.target_pose.theta_x = 180.0
+                    my_constrained_pose.target_pose.theta_y = 0.0
+                    my_constrained_pose.target_pose.theta_z = 90.0
+                    req = ExecuteActionRequest()
+                    req.input.oneof_action_parameters.reach_pose.append(my_constrained_pose)
+                    req.input.name = "pose2"
+                    req.input.handle.action_type = ActionType.REACH_POSE
+                    req.input.handle.identifier = 1001
+
+                    rospy.loginfo("Sending pose 2...")
+                    self.last_action_notif_type = None
+                    try:
+                        self.execute_action(req)
+                    except rospy.ServiceException:
+                        rospy.logerr("Failed to send pose 2")
+                        success = False
+                    
+                    rospy.loginfo("Waiting for pose 2 to finish...")
+                    time.sleep(1)
+                    self.example_send_gripper_command(0.45) 
+                    pickedup=True
+                    
+                    my_constrained_pose = ConstrainedPose()
+                    my_constrained_pose.constraint.oneof_type.speed.append(my_cartesian_speed)
+                    my_constrained_pose.target_pose.x = self.location_x
+                    my_constrained_pose.target_pose.y = self.location_y
+                    my_constrained_pose.target_pose.z = 0.4
+                    my_constrained_pose.target_pose.theta_x = 180.0
+                    my_constrained_pose.target_pose.theta_y = 0.0
+                    my_constrained_pose.target_pose.theta_z = 90.0
+                    req = ExecuteActionRequest()
+                    req.input.oneof_action_parameters.reach_pose.append(my_constrained_pose)
+                    req.input.name = "pose3"
+                    req.input.handle.action_type = ActionType.REACH_POSE
+                    req.input.handle.identifier = 1001
+
+                    rospy.loginfo("Sending pose 3...")
+                    self.last_action_notif_type = None
+                    try:
+                        self.execute_action(req)
+                    except rospy.ServiceException:
+                        rospy.logerr("Failed to send pose 3")
+                        success = False
+                    
+                    rospy.loginfo("Waiting for pose 3 to finish...")
+                    time.sleep(1)
+                    pickedup=True
+
+                if pickedup:
+                    my_constrained_pose = ConstrainedPose()
+                    my_constrained_pose.constraint.oneof_type.speed.append(my_cartesian_speed)
+                    my_constrained_pose.target_pose.x = 0.6
+                    my_constrained_pose.target_pose.y = 0.2
+                    my_constrained_pose.target_pose.z = 0.4
+                    my_constrained_pose.target_pose.theta_x = 180.0
+                    my_constrained_pose.target_pose.theta_y = 0.0
+                    my_constrained_pose.target_pose.theta_z = 90.0
+                    req = ExecuteActionRequest()
+                    req.input.oneof_action_parameters.reach_pose.append(my_constrained_pose)
+                    req.input.name = "pose4"
+                    req.input.handle.action_type = ActionType.REACH_POSE
+                    req.input.handle.identifier = 1001
+
+                    rospy.loginfo("Sending pose 4...")
+                    self.last_action_notif_type = None
+                    try:
+                        self.execute_action(req)
+                    except rospy.ServiceException:
+                        rospy.logerr("Failed to send pose 4")
+                        success = False
+                    
+                    rospy.loginfo("Waiting for pose 4 to finish...")
+                    time.sleep(1)
+                    self.example_send_gripper_command(0.0) 
+                    pickedup=False
+                    self.marker_present=False
+                '''
+
                 rate.sleep()
-                # rospy.loginfo(str(aruco_location_x))
-                
-            # _,x_,y_,z_=self.follow_aruco(self.location_x,self.location_y,0.35)
-            # rospy.loginfo(str(x_))
-            rospy.sleep(1)
-            success &= self.example_send_gripper_command(0.4)
-            # self.goto(x_,y_,0.04)
+        
+            # rospy.sleep(1)
+            # success &= self.example_send_gripper_command(0.0)
+            # success &=self.goto(self.location_x,self.location_y,0.04)
             # rospy.sleep(1)
             # success &= self.example_send_gripper_command(0.5)
             # rospy.sleep(1)
-            # self.goto(x_,y_,0.35)
+            # success &=self.goto(self.location_x,self.location_y,0.35)
             # rospy.sleep(1)
-            # self.goto(0.33,0.31,0.35)
+            # success &=self.goto(0.33,0.31,0.35)
+            # rospy.sleep(2)
+            # success &=self.goto(0.33,0.31,0.26)
             # rospy.sleep(1)
-            # self.goto(0.33,0.31,0.26)
+            # success &= self.example_send_gripper_command(0.0)
             # rospy.sleep(1)
-            # success &=self.example_send_gripper_command(0.0)
-            # rospy.sleep(1)
-            # self.goto(0.4,0.1,0.42)
+            # success &=self.goto(0.4,0.1,0.42)
 
+
+
+            '''
+            # Prepare and send pose 2
+            req.input.handle.identifier = 1002
+            req.input.name = "pose2"
+
+            my_constrained_pose.target_pose.z = 0.3
+
+            req.input.oneof_action_parameters.reach_pose[0] = my_constrained_pose
+
+            rospy.loginfo("Sending pose 2...")
+            self.last_action_notif_type = None
+            try:
+                self.execute_action(req)
+            except rospy.ServiceException:
+                rospy.logerr("Failed to send pose 2")
+                success = False
+            else:
+                rospy.loginfo("Waiting for pose 2 to finish...")
+
+            self.wait_for_action_end_or_abort()
+
+            # Prepare and send pose 3
+            req.input.handle.identifier = 1003
+            req.input.name = "pose3"
+
+            my_constrained_pose.target_pose.x = 0.45
+
+            req.input.oneof_action_parameters.reach_pose[0] = my_constrained_pose
+
+            rospy.loginfo("Sending pose 3...")
+            self.last_action_notif_type = None
+            try:
+                self.execute_action(req)
+            except rospy.ServiceException:
+                rospy.logerr("Failed to send pose 3")
+                success = False
+            else:
+                rospy.loginfo("Waiting for pose 3 to finish...")
+
+            self.wait_for_action_end_or_abort()
+            '''
             success &= self.all_notifs_succeeded
 
             success &= self.all_notifs_succeeded
