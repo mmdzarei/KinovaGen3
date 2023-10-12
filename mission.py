@@ -80,34 +80,17 @@ class ExampleCartesianActionsWithNotifications:
             self.tool_pose_x=feedback.base.tool_pose_x
             self.tool_pose_y=feedback.base.tool_pose_y
             self.tool_pose_z=feedback.base.tool_pose_z
+            self.tool_pose_theta_x=feedback.base.tool_pose_theta_x
+            self.tool_pose_theta_y=feedback.base.tool_pose_theta_y
+            self.tool_pose_theta_z=feedback.base.tool_pose_theta_z
+
 
         except:
             self.is_init_success = False
         else:
             self.is_init_success = True
 
-        self.tasks = {
-                'Detect_Aruco_Code': self.aruco_action,
-                'Read_Aruco_Position': self.get_single_aruco_pos,
-                'Move_to_Position': self.goto,
-                # 'Lower_Arm_to_Cube': lower_arm_to_cube,
-                # 'Grab_Cube': grab_cube,
-                # 'Raise_Cube': raise_cube,
-                # 'Search_for_Second_Aruco': search_for_second_aruco,
-                # 'Move_Cube_to_Second_Aruco': move_cube_to_second_aruco,
-            }     
 
-        # Define the task sequence
-        self.task_sequence = [
-            'Detect_Aruco_Code'
-            ,'Read_Aruco_Position'
-            ,'Move_to_Position'
-            # ,'Lower_Arm_to_Cube',
-            # ,'Grab_Cube',
-            # ,'Raise_Cube',
-            # ,'Search_for_Second_Aruco',
-            # ,'Move_Cube_to_Second_Aruco',
-        ]
         
     def aruco_action(self,data):
         #rospy.loginfo("IDs: %s"%str(data.data))
@@ -143,6 +126,9 @@ class ExampleCartesianActionsWithNotifications:
                     self.tool_pose_x=feedback.base.tool_pose_x
                     self.tool_pose_y=feedback.base.tool_pose_y
                     self.tool_pose_z=feedback.base.tool_pose_z
+                    self.tool_pose_theta_x=feedback.base.tool_pose_theta_x
+                    self.tool_pose_theta_y=feedback.base.tool_pose_theta_y
+                    self.tool_pose_theta_z=feedback.base.tool_pose_theta_z
                     tool_pos=f"tool_pos:\t{(self.tool_pose_x)}\t, {(self.tool_pose_y)}\t, {(self.tool_pose_z)}"
                     #rospy.loginfo(tool_pos)
                     location_x=self.location_x
@@ -182,7 +168,39 @@ class ExampleCartesianActionsWithNotifications:
 
             return self.wait_for_action_end_or_abort()
             #return True
-    
+    def grab_cube(self,grip):
+        self.example_send_gripper_command(grip)
+    def drop_cube(self,grip):
+        self.example_send_gripper_command(grip)
+    def raise_up(self,height):
+        my_cartesian_speed = CartesianSpeed()
+        my_cartesian_speed.translation = 0.05 # m/s
+        my_cartesian_speed.orientation = 15  # deg/s
+        my_constrained_pose = ConstrainedPose()
+        my_constrained_pose.constraint.oneof_type.speed.append(my_cartesian_speed)
+        my_constrained_pose.target_pose.x = self.tool_pose_x
+        my_constrained_pose.target_pose.y = self.tool_pose_y
+        my_constrained_pose.target_pose.z = height
+        my_constrained_pose.target_pose.theta_x = self.tool_pose_theta_x
+        my_constrained_pose.target_pose.theta_y = self.tool_pose_theta_y
+        my_constrained_pose.target_pose.theta_z = self.tool_pose_theta_z
+
+        req = ExecuteActionRequest()
+        req.input.oneof_action_parameters.reach_pose.append(my_constrained_pose)
+        req.input.name = "safe height"
+        req.input.handle.action_type = ActionType.REACH_POSE
+        req.input.handle.identifier = 1001
+
+        rospy.loginfo("Sending safe height ...")
+        self.last_action_notif_type = None
+        try:
+            self.execute_action(req)
+        except rospy.ServiceException:
+            rospy.logerr("Failed to send safe height")
+            success = False
+        else:
+            rospy.loginfo("Waiting for raise_up to finish...")
+            return self.wait_for_action_end_or_abort()
     def cb_action_topic(self, notif):
         self.last_action_notif_type = notif.action_event
 
@@ -322,17 +340,51 @@ class ExampleCartesianActionsWithNotifications:
             #*******************************************************************************
             # Prepare and send pose 1
 
+            self.tasks = {
+                'Detect_Aruco_Code': self.aruco_action,
+                'Read_Aruco_Position': self.get_single_aruco_pos,
+                'Move_to_Position': self.goto,
+                'Lower_Arm_to_Cube': self.goto,
+                'Drop_Cube': self.drop_cube,
+                'Grab_Cube': self.grab_cube,
+                'Raise_Up': self.raise_up
+                # 'Search_for_Second_Aruco': search_for_second_aruco,
+                # 'Move_Cube_to_Second_Aruco': move_cube_to_second_aruco,
+            }     
 
+            # Define the task sequence
+            self.task_sequence = [
+                'Raise_Up'
+                ,'Detect_Aruco_Code'
+                ,'Read_Aruco_Position'
+                ,'Drop_Cube'
+                ,'Move_to_Position'
+                ,'Lower_Arm_to_Cube'
+                ,'Grab_Cube'
+                ,'Raise_Up'
+                ,'Drop_Cube'
+                # ,'Search_for_Second_Aruco'
+                # ,'Move_Cube_to_Second_Aruco'
+            ]
             # Execute the tasks in sequence
             for task in self.task_sequence:
                 if task in self.tasks:
-                    if task == 'Move_to_Position':
+                    if task=='Drop_Cube':
+                        self.tasks['Drop_Cube'](0.0)
+                    elif task == 'Move_to_Position':
                         self.tasks['Move_to_Position'](location_x, location_y,0.40)
                         rospy.logwarn(f"{location_x}, {location_y}, {location_z}")
                     elif task=='Detect_Aruco_Code':
                         pass
                     elif task=='Read_Aruco_Position':
                         pass
+                    elif task=='Lower_Arm_to_Cube':
+                        self.tasks['Lower_Arm_to_Cube'](location_x, location_y,0.35)
+                    elif task=='Grab_Cube':
+                        self.tasks['Grab_Cube'](0.42)
+                    elif task=='Raise_Up':
+                        self.tasks['Raise_Up'](0.45)
+
                     else:
                         result = self.tasks[task]()
                         if result is False:
