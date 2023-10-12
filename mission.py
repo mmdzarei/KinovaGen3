@@ -189,7 +189,7 @@ class ExampleCartesianActionsWithNotifications:
         req.input.oneof_action_parameters.reach_pose.append(my_constrained_pose)
         req.input.name = "safe height"
         req.input.handle.action_type = ActionType.REACH_POSE
-        req.input.handle.identifier = 1001
+        req.input.handle.identifier = 1002
 
         rospy.loginfo("Sending safe height ...")
         self.last_action_notif_type = None
@@ -344,7 +344,6 @@ class ExampleCartesianActionsWithNotifications:
                 'Detect_Aruco_Code': self.aruco_action,
                 'Read_Aruco_Position': self.get_single_aruco_pos,
                 'Move_to_Position': self.goto,
-                'Lower_Arm_to_Cube': self.goto,
                 'Drop_Cube': self.drop_cube,
                 'Grab_Cube': self.grab_cube,
                 'Raise_Up': self.raise_up
@@ -354,48 +353,37 @@ class ExampleCartesianActionsWithNotifications:
 
             # Define the task sequence
             self.task_sequence = [
-                'Raise_Up'
-                ,'Detect_Aruco_Code'
-                ,'Read_Aruco_Position'
-                ,'Drop_Cube'
-                ,'Move_to_Position'
-                ,'Lower_Arm_to_Cube'
-                ,'Grab_Cube'
-                ,'Raise_Up'
-                ,'Drop_Cube'
-                # ,'Search_for_Second_Aruco'
-                # ,'Move_Cube_to_Second_Aruco'
-            ]
-            # Execute the tasks in sequence
-            for task in self.task_sequence:
-                if task in self.tasks:
-                    if task=='Drop_Cube':
-                        self.tasks['Drop_Cube'](0.0)
-                    elif task == 'Move_to_Position':
-                        self.tasks['Move_to_Position'](location_x, location_y,0.40)
-                        rospy.logwarn(f"{location_x}, {location_y}, {location_z}")
-                    elif task=='Detect_Aruco_Code':
-                        pass
-                    elif task=='Read_Aruco_Position':
-                        pass
-                    elif task=='Lower_Arm_to_Cube':
-                        self.tasks['Lower_Arm_to_Cube'](location_x, location_y,0.35)
-                    elif task=='Grab_Cube':
-                        self.tasks['Grab_Cube'](0.42)
-                    elif task=='Raise_Up':
-                        self.tasks['Raise_Up'](0.45)
+                ('Move_to_Position', (0.47, 0.0, 0.3)),
+                # ('Raise_Up',(0.3,)),  
+                # ('Detect_Aruco_Code',()),
+                # ('Read_Aruco_Position',()),
+                ('Drop_Cube',(0.0,)),
+                ('Move_to_Position', (self.location_x, self.location_y, 0.04)),
+                # ('Move_to_Position', (self.location_x, self.location_y, 0.04)),  # Pass the specific x, y, z values
+                ('Grab_Cube',(0.49,)),
+                ('Raise_Up',(0.30,)),
+                ('Move_to_Position', (0.22, 0.29, 0.26)),
+                ('Drop_Cube',(0.0,)),
+                ('Raise_Up',(0.40,)),
+                # ('Move_to_Position', (0.47, 0.0, 0.35))
+                # ('Search_for_Second_Aruco',),
+                # ('Move_Cube_to_Second_Aruco',),
+                ]
 
+            for task_name, parameters in self.task_sequence:
+                task = self.tasks.get(task_name)
+                if task:
+                    if parameters:
+                        task(*parameters)  # Call the task with parameters
                     else:
-                        result = self.tasks[task]()
-                        if result is False:
-                            print(f"Task '{task}' failed.")
+                        task()  # Call the task without parameters
+
                 else:
                     print(f"Task '{task}' is not defined.")
 
 
 
             success &= self.all_notifs_succeeded
-
             success &= self.all_notifs_succeeded
 
         # For testing purposes
