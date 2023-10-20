@@ -21,7 +21,7 @@ from std_msgs.msg import UInt32MultiArray
 
 from aruco_msgs.msg import MarkerArray
 
-from tf.transformations import euler_from_quaternion, quaternion_from_euler
+from tf.transformations import * #euler_from_quaternion, quaternion_from_euler, quaternion_matrix
 import math
 
 class Aruco:
@@ -153,8 +153,8 @@ class ExampleCartesianActionsWithNotifications:
     def goto(self,x,y,z,tx=180.0,ty=0.0,tz=90.0):
        
             my_cartesian_speed = CartesianSpeed()
-            my_cartesian_speed.translation = 0.25 # m/s
-            my_cartesian_speed.orientation = 15  # deg/s
+            my_cartesian_speed.translation = 0.3 # m/s
+            my_cartesian_speed.orientation = 100  # deg/s
             my_constrained_pose = ConstrainedPose()
             my_constrained_pose.constraint.oneof_type.speed.append(my_cartesian_speed)
             my_constrained_pose.target_pose.x = x
@@ -186,8 +186,8 @@ class ExampleCartesianActionsWithNotifications:
     def goto_aruco(self,x,y,z,tx=180.0,ty=0.0,tz=90.0):
         if (abs(self.tool_pose_x-self.location_x)>0.005 or abs(self.tool_pose_y-self.location_y)>0.005):
             my_cartesian_speed = CartesianSpeed()
-            my_cartesian_speed.translation = 0.05 # m/s
-            my_cartesian_speed.orientation = 15  # deg/s
+            my_cartesian_speed.translation = 0.25 # m/s
+            my_cartesian_speed.orientation = 35  # deg/s
             my_constrained_pose = ConstrainedPose()
             my_constrained_pose.constraint.oneof_type.speed.append(my_cartesian_speed)
             my_constrained_pose.target_pose.x = self.location_x
@@ -424,17 +424,24 @@ class ExampleCartesianActionsWithNotifications:
 
                     elif state == 2:
                         if ar.num_markers > 0:
-                            pose=ar.get_marker_by_ord(0)
-                            self.roll,self.pitch,self.yaw=euler_from_quaternion([pose.orientation.x,pose.orientation.y,pose.orientation.z,pose.orientation.w])
+                            self.pose=ar.get_marker_by_ord(0)
+                            self.roll,self.pitch,self.yaw=euler_from_quaternion([self.pose.orientation.x,self.pose.orientation.y,self.pose.orientation.z,self.pose.orientation.w])
+                            matr = quaternion_matrix([self.pose.orientation.x,self.pose.orientation.y,self.pose.orientation.z,self.pose.orientation.w])
+                            matt = translation_matrix([self.pose.position.x, self.pose.position.y, self.pose.position.z])
+                            mattransf = numpy.dot(matt,matr)
+                            point = numpy.dot(mattransf,[0, 0, 0.1, 1])
+                            point2 = numpy.dot(mattransf,[0.1, 0, 0, 1])
+                            
+                            print("transformed point "+ str(point))
                             #self.roll,self.pitch,self.yaw=self.orientation
-                            print(self.roll)
-                            print(self.pitch)
-                            print(self.yaw)
+                            #print(self.roll)
+                            #print(self.pitch)
+                            #print(self.yaw)
                             self.roll=math.degrees(self.roll)
                             self.pitch=math.degrees(self.pitch)
                             self.yaw=math.degrees(self.yaw)
                             print("goto marker")
-                            self.goto(pose.position.x, pose.position.y, pose.position.z+0.0,self.roll+180, self.pitch, self.yaw)
+                            self.goto(point[0], point[1], point[2],self.roll+180, self.pitch, self.yaw)
                             # self.goto(pose.position.x, pose.position.y, pose.position.z+0.0,90, 0, 90)
                             ar.num_markers = 0
                             state = 3
@@ -445,26 +452,33 @@ class ExampleCartesianActionsWithNotifications:
                         if val == 1:
                             state = 4
                         
-
-                    elif state ==4:
-                        if self.grab_cube(0.53):
-                            rospy.loginfo("Cube has been grabbed")
-                            state=5
-                        else:
-                            rospy.logwarn("couldn't grab the Cube")
+                    elif state == 4:
+                        self.goto(self.pose.position.x, self.pose.position.y, self.pose.position.z+0.0,self.roll+180, self.pitch, self.yaw)
                         state = 5
-                  
-                    elif state == 5:
-                        state = 6
-                        self.goto(0.2,-0.5,0.30)
-                        state=7
                         
-                    elif state==7: # wait to reach home
+                    elif state == 5:
                         val = self.check_for_action_end_or_abort()
                         if val == 1:
-                            state = 8
+                            state = 6
+                        
+
+                    elif state ==6:
+                        if self.grab_cube(0.53):
+                            rospy.loginfo("Cube has been grabbed")
+                        else:
+                            rospy.logwarn("couldn't grab the Cube")
+                        state = 7
+                  
+                    elif state == 7:
+                        self.goto(0.2,-0.5,0.30)
+                        state=8
+                        
+                    elif state==8: # wait to reach home
+                        val = self.check_for_action_end_or_abort()
+                        if val == 1:
+                            state = 9
                                                         
-                    elif state==8:
+                    elif state==9:
                         if self.grab_cube(0.0):
                             rospy.loginfo("Cube has been dropped")
                             state=0
